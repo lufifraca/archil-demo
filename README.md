@@ -8,15 +8,15 @@ A data-analyst AI agent whose workspace lives on an [Archil](https://archil.com)
 
 - **Persistent workspace.** The disk is mounted at `/mnt/archil/workspace`. Every bash command runs in a fresh container, so anything worth keeping (scripts, cleaned data, charts, `report.md`) is saved to the disk.
 - **Builds on earlier work.** Before starting, the agent checks the disk for earlier scripts and reports and reuses them instead of starting over.
-- **Live dashboard.** A small local server streams tool calls to `http://localhost:4321` over Server-Sent Events, showing steps, file reads and writes, and the final chart.
+- **Live dashboard.** A small local server streams tool calls to http://localhost:4321 over Server-Sent Events, showing steps, file reads and writes, and the final chart.
 - **Audit trail.** Every tool call is appended to `.audit/<timestamp>.jsonl` on the disk, and runs are counted in `.demo/runs.jsonl`.
 
-Built with the [Vercel AI SDK](https://ai-sdk.dev) (`ToolLoopAgent`), `@ai-sdk/anthropic`, and `@archildata/ai-sdk` for the disk tools.
+Built with the Vercel AI SDK (`ToolLoopAgent`), `@ai-sdk/anthropic`, and `@archildata/ai-sdk` for the disk tools.
 
 ## Project layout
 
 | File | Purpose |
-|---|---|
+| --- | --- |
 | `agent.mjs` | Entry point: sets up the agent, the disk tools, the audit log and the dashboard |
 | `dashboard-server.mjs` | Serves `dashboard.html` and streams run events (no dependencies beyond `node:http`) |
 | `dashboard.html` | The live run viewer |
@@ -27,7 +27,7 @@ Built with the [Vercel AI SDK](https://ai-sdk.dev) (`ToolLoopAgent`), `@ai-sdk/a
 
 ## Setup
 
-Requires Node.js 18+ and an Archil disk that holds the dataset at `data/taxi.parquet`, with Python libraries (pandas, pyarrow, matplotlib) installed under `pylib/`.
+Requires Node.js 18+ and an Archil disk that holds the dataset at `data/taxi.parquet`, with Python libraries (pandas, pyarrow, matplotlib) installed under `pylib/` (see [Gotchas](#gotchas-i-hit-so-you-dont-have-to) for how).
 
 ```bash
 npm install
@@ -36,7 +36,7 @@ npm install
 Set these environment variables:
 
 | Variable | Description |
-|---|---|
+| --- | --- |
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 | `ARCHIL_API_KEY` | Archil API key |
 | `ARCHIL_REGION` | Region of your Archil disk |
@@ -63,9 +63,46 @@ When a run finishes, `report.md` and the newest chart are downloaded from the di
 
 ## Example results
 
-From [`report.md`](report.md), produced by the agent:
+From `report.md`, produced by the agent:
 
-- Cleaned 2,964,624 raw trips down to **2,826,978 (95.4%)** by removing bad timestamps, impossible distances, fares and speeds.
+- Cleaned 2,964,624 raw trips down to 2,826,978 (95.4%) by removing bad timestamps, impossible distances, fares and speeds.
 - The typical trip is 1.7 miles, takes about 12 minutes and has a $12.80 fare.
 - Card tips run at a median of 25–26% of the fare, peaking at 27–28% in the evening (16:00–20:00).
 - Trips peak at 17:00–18:00 and are fewest at 4:00.
+
+## Gotchas I hit (so you don't have to)
+
+**1. Getting a local file onto the disk.** The `disk` CLI has no upload command. From code, use the SDK's `putObject`:
+
+```js
+import { readFile } from "node:fs/promises";
+await disk.putObject("analyze.py", await readFile("analyze.py"));
+```
+
+From the shell only, you can pipe the file through `exec` as base64 (PowerShell):
+
+```powershell
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("analyze.py"))
+npx disk exec $env:ARCHIL_DISK_ID "echo $b64 | base64 -d > analyze.py"
+```
+
+**2. The disk lives at different paths.** `disk exec` mounts the disk at `/mnt/archil`. The AI SDK workspace in this demo mounts it at `/mnt/archil/workspace`. Same files, different prefix, so use the right one in each place (the agent's instructions use the workspace path).
+
+**3. Deleting files from `exec` needs a checkout.** Disks mount in shared mode, where you can create new files right away but changing or deleting existing ones requires owning them first. Without a checkout, `rm` fails with "Read-only file system":
+
+```bash
+npx disk exec $ARCHIL_DISK_ID "archil checkout /mnt/archil && rm old_script.py && archil checkin /mnt/archil"
+```
+
+From code, `disk.deleteObject("old_script.py")` also works.
+
+**4. Python packages that persist.** Every sandbox starts fresh, so a normal `pip install` disappears after each command. Install packages into a folder on the disk once, then point Python at it:
+
+```bash
+# once
+npx disk exec $ARCHIL_DISK_ID "python3 -m pip install --target pylib pandas pyarrow matplotlib"
+
+# every time (note the path difference from gotcha 2)
+PYTHONPATH=/mnt/archil/pylib python3 script.py             # in disk exec
+PYTHONPATH=/mnt/archil/workspace/pylib python3 script.py   # in the agent's tools
+```
