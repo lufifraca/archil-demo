@@ -4,6 +4,8 @@ A data-analyst AI agent whose workspace lives on an [Archil](https://archil.com)
 
 ![Median tip % by pickup hour](tips_by_hour.png)
 
+**Slides:** [Giving AI agents a disk that remembers](docs/archil-slides.pdf) (PDF, 8 slides). The walkthrough covers why Archil exists and how it works, then frames this repo as the live demo.
+
 ## How it works
 
 - **Persistent workspace.** The disk is mounted at `/mnt/archil/workspace`. Every bash command runs in a fresh container, so anything worth keeping (scripts, cleaned data, charts, `report.md`) is saved to the disk.
@@ -24,6 +26,7 @@ Built with the Vercel AI SDK (`ToolLoopAgent`), `@ai-sdk/anthropic`, and `@archi
 | `replay.mjs` | Practice mode: plays a scripted run through the dashboard without calling any APIs |
 | `analyze.py` | Quick sanity check that loads the dataset from the disk |
 | `report.md`, `*.png` | Example output pulled down from the disk after a run |
+| `docs/archil-slides.pdf` | Presentation deck that accompanies the demo |
 
 ## Setup
 
