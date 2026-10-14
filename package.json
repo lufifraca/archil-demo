@@ -1,0 +1,19 @@
+{
+  "name": "archil-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.79",
+    "@archildata/ai-sdk": "^0.0.19",
+    "ai": "^7.0.138",
+    "disk": "^1.8.0"
+  }
+}
